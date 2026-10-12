@@ -1,0 +1,24 @@
+kubectl port-forward --address 0.0.0.0 svc/prometheus-grafana 8080:80 -n monitoring
+kubectl port-forward --address 0.0.0.0 svc/falco-falcosidekick-ui 2802:2802 -n falco
+kubectl port-forward svc/n8n-service 5678:5678 -n n8n --address 0.0.0.0
+kubectl port-forward --address 0.0.0.0 svc/dvwa 8000:80 -n dvwa
+kubectl port-forward --address 0.0.0.0 svc/waf-standalone-svc 8888:80
+____________________________________________________________________________________________________________________________________________________________________
+#!/bin/bash
+kubectl logs -f --since=1s deployment/waf-standalone | grep -Ei --line-buffered "SQL Injection|XSS|Cross-site Scripting|Path Traversal" | while read line ; do
+    if echo "$line" | grep -qi "SQL Injection"; then
+        ATTACK_TYPE="SQL INJECTION (SQLi)"
+    elif echo "$line" | grep -qiE "XSS|Cross-site Scripting"; then
+        ATTACK_TYPE="CROSS-SITE SCRIPTING (XSS)"
+    elif echo "$line" | grep -qiE "Path Traversal|Directory Traversal"; then
+        ATTACK_TYPE="PATH TRAVERSAL"
+    else
+        ATTACK_TYPE="WAF RULE TRIGGERED (OTHER)"
+    fi
+    json_payload=$(jq -n --arg msg "$line" --arg type "$ATTACK_TYPE" '{"alert_type": $type, "message": $msg}')
+    curl -X POST "http://localhost:5678/webhook/waf-alerts" \
+    -H "Content-Type: application/json" \
+    -d "$json_payload"
+    #Nghỉ 2 giây sau mỗi lần gửi để chống Spam và nghẽn DNS!
+    sleep 2
+done
