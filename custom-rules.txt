@@ -1,0 +1,20 @@
+customRules:
+  dvwa-webshell.yaml: |-
+    # RULE 1: Bắt mọi hành vi ghi file .php trong container
+    - rule: Detect WebShell Upload (DVWA)
+      desc: Phat hien file PHP duoc tao hoac sua doi
+      condition: >
+        open_write and container and
+        (fd.name endswith ".php" or fd.name endswith ".phtml")
+      output: "CẢNH BÁO WEBSHELL UPLOAD! File %fd.name vừa được ghi bởi tiến trình %proc.name (pod=%k8s.pod.name)"
+      priority: WARNING
+      tags: [dvwa, webshell]
+    # RULE 2: Bắt mọi hành vi chạy lệnh hệ thống nhạy cảm trong container
+    - rule: Detect WebShell Execution (RCE)
+      desc: Phat hien thuc thi lenh he thong tu Webshell
+      condition: >
+        spawned_process and container and
+        proc.name in (whoami, id, uname, nc, netcat, wget, curl, ls, cat)
+      output: "CẢNH BÁO WEBSHELL RCE! Lệnh vừa thực thi: %proc.cmdline - Tiến trình cha: %proc.pname (pod=%k8s.pod.name)"
+      priority: CRITICAL
+      tags: [dvwa, webshell, rce]

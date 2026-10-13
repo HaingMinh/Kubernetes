@@ -1,0 +1,34 @@
+customRules:
+  master-rules.yaml: |
+    - rule: Detect Container Discovery Commands (Stage 2)
+      desc: Phat hien thiet lap mang hoac thong tin user
+      condition: >
+        spawned_process and container and
+        (proc.name in (ip, arp, netstat, nmap, ping, whoami, id))
+      output: >
+        CANH BAO RA QUET (DISCOVERY): Tien trinh %proc.name dang tham thinh he thong. (Lenh: %proc.cmdline | User: %user.name | Pod: %k8s.pod.name)
+      priority: CRITICAL
+      tags: [discovery, k8s, stage_2]
+
+    - rule: Detect Execution and File Modification (Stage 2)
+      desc: Phat hien thao tac file nhay cam
+      condition: >
+        k8s.ns.name = "dvwa" and
+        (
+          (evt.type in (open, openat, openat2) and evt.is_open_write = true and fd.name startswith /var/www/html/hackable/uploads/) or
+          (evt.type in (open, openat, openat2) and evt.is_open_read = true and fd.name in (/etc/shadow, /etc/passwd))
+        )
+      output: >
+        CANH BAO XAM NHAP (EXECUTION): Tuong tac file dang ngo [%fd.name]. (Tien trinh: %proc.name | Lenh: %proc.cmdline)
+      priority: CRITICAL
+      tags: [execution, privilege_escalation, stage_2]
+
+    - rule: Detect Data Exfiltration Tools (Stage 3)
+      desc: Phat hien su dung cong cu mang
+      condition: >
+        k8s.ns.name = "dvwa" and evt.type = execve and 
+        (proc.name in (curl, wget, nc, ncat) or proc.cmdline contains "curl " or proc.cmdline contains "wget " or proc.cmdline contains "http")
+      output: >
+        CANH BAO TRICH XUAT DU LIEU (EXFILTRATION): Phat hien cong cu mang. (Tien trinh: %proc.name | Lenh: %proc.cmdline | Pod: %k8s.pod.name)
+      priority: CRITICAL
+      tags: [exfiltration, network, stage_3]
